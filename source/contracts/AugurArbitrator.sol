@@ -43,6 +43,8 @@ contract AugurArbitrator is BalanceHolder {
     struct RealitioQuestion {
         uint256 bounty;
         address disputer;
+        address augur_market;
+        address owner;
     }
 
     struct AugurMarket {
@@ -81,7 +83,7 @@ contract AugurArbitrator is BalanceHolder {
     /// @notice Create a market in Augur and store the creator as its owner
     /// @dev Anyone can all this, and calling this will give them the rights to claim the bounty
     /// @dev If people want to create multiple markets for the same question, they can, and the first to resolve can get paid
-    /// @dev Their account will need to have been funded with some REP for the no-show bond.
+    /// @dev They will need have sent this contract some REP for the no-show bond.
     /// @param question_id The question in question
     /// @param question The question content // TODO Check if realitio format and the Augur format, see if we need to convert anything
     /// @param timeout The timeout between rounds, set when the question was created
@@ -99,10 +101,8 @@ contract AugurArbitrator is BalanceHolder {
         require(realitio_questions[question_id].bounty > 0);
 
         // Create a market that's already finished
-        IMarket market = latest_universe.createYesNoMarket.value(msg.value)( now, 0, market_token, designated_reporter, 0x0, question, "");
-        
-        augur_markets[market].question_id = question_id;
-        augur_markets[market].owner = msg.sender;
+        realitio_questions[question_id].augur_market = latest_universe.createYesNoMarket.value(msg.value)( now, 0, market_token, designated_reporter, 0x0, question, "");
+        realitio_questions[question_id].owner = msg.sender;
     }
 
     /// @notice Return data needed to verify the last history item
@@ -236,10 +236,9 @@ contract AugurArbitrator is BalanceHolder {
 
         realitio.submitAnswerByArbitrator(question_id, answer, winner);
 
-        address owner = augur_markets[market].owner;
+        address owner = realitio_questions[question_id].owner;
         balanceOf[owner] += realitio_questions[question_id].bounty;
 
-        delete augur_markets[market];
         delete realitio_questions[question_id];
 
     }
