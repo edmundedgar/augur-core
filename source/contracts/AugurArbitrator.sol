@@ -84,7 +84,6 @@ contract AugurArbitrator is BalanceHolder {
     /// @dev Anyone can all this, and calling this will give them the rights to claim the bounty
     /// @dev If people want to create multiple markets for the same question, they can, and the first to resolve can get paid
     /// @dev They will need have sent this contract some REP for the no-show bond.
-    /// @param question_id The question in question
     /// @param question The question content // TODO Check if realitio format and the Augur format, see if we need to convert anything
     /// @param timeout The timeout between rounds, set when the question was created
     /// @param opening_ts The opening timestamp for the question, set when the question was created
@@ -92,12 +91,11 @@ contract AugurArbitrator is BalanceHolder {
     /// @param nonce The nonce for the question, set when the question was created
     /// @param designated_reporter The Augur designated reporter. We let the market creator choose this, if it's bad the Augur dispute resolution should sort it out
     function createMarket(
-        bytes32 question_id, string question, uint32 timeout, uint32 opening_ts, address asker, uint256 nonce,
+        string question, uint32 timeout, uint32 opening_ts, address asker, uint256 nonce,
         address designated_reporter
     ) external payable {
         // Make sure the parameters provided match the question in question
-        require(question_id == keccak256(keccak256(template_id, opening_ts, question), this, timeout, asker, nonce));
-
+        bytes32 question_id = keccak256(keccak256(template_id, opening_ts, question), this, timeout, asker, nonce);
         require(realitio_questions[question_id].bounty > 0);
 
         // Create a market that's already finished

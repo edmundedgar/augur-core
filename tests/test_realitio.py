@@ -57,13 +57,13 @@ def test_realitio(localFixture, controller, universe):
 
     # Revert if you haven't yet requested arbitration
     with raises(TransactionFailed):
-        augurarbcon.createMarket(question_id, "Is this thing on?", timeout, opening_ts, question_asker, nonce, designated_reporter)
+        augurarbcon.createMarket("Is this thing on?", timeout, opening_ts, question_asker, nonce, designated_reporter)
 
     augurarbcon.requestArbitration(question_id, 321, value=12345)
 
     # Fail if the contract doesn't yet own sufficient REP
     with raises(TransactionFailed):
-        augurarbcon.createMarket(question_id, "Is this thing on?", timeout, opening_ts, question_asker, nonce, designated_reporter, value=valbond)
+        augurarbcon.createMarket("Is this thing on?", timeout, opening_ts, question_asker, nonce, designated_reporter, value=valbond)
 
     # Make sure the arbitrator contract has some REP for the validity bond
     # TODO: Work out how to prevent someone else from spending the REP before you can use it
@@ -74,7 +74,7 @@ def test_realitio(localFixture, controller, universe):
     # This will do some checks then call:
     # IMarket market = universe.createYesNoMarket.value(msg.value)( now+1, 0, market_token, designated_reporter, 0x0, question, "");
 
-    augurarbcon.createMarket(question_id, "Is this thing on?", timeout, opening_ts, question_asker, nonce, designated_reporter, value=valbond)
+    augurarbcon.createMarket("Is this thing on?", timeout, opening_ts, question_asker, nonce, designated_reporter, value=valbond)
 
     return
     proceedToDesignatedReporting(localFixture, market)
