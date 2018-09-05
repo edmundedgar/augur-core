@@ -99,7 +99,7 @@ contract AugurArbitrator is BalanceHolder {
         require(realitio_questions[question_id].bounty > 0);
 
         // Create a market that's already finished
-        IMarket market = latest_universe.createYesNoMarket.value(msg.value)( now+1, 0, market_token, designated_reporter, 0x0, question, "");
+        IMarket market = latest_universe.createYesNoMarket.value(msg.value)( now, 0, market_token, designated_reporter, 0x0, question, "");
         
         augur_markets[market].question_id = question_id;
         augur_markets[market].owner = msg.sender;
