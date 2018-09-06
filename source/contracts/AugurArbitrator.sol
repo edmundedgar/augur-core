@@ -43,7 +43,7 @@ contract AugurArbitrator is BalanceHolder {
     struct RealitioQuestion {
         uint256 bounty;
         address disputer;
-        address augur_market;
+        IMarket augur_market;
         address owner;
     }
 
@@ -52,8 +52,7 @@ contract AugurArbitrator is BalanceHolder {
         address owner; // The address that created the market and should be paid if it resolves the question
     }
 
-    mapping(bytes32 => RealitioQuestion) realitio_questions;
-    mapping(address => AugurMarket) augur_markets;
+    mapping(bytes32 => RealitioQuestion) public realitio_questions;
 
     function initialize(IRealitio _realitio, uint256 _template_id, uint256 _dispute_fee, IUniverse _genesis_universe, ICash _market_token) 
     external {
@@ -97,7 +96,7 @@ contract AugurArbitrator is BalanceHolder {
         // Make sure the parameters provided match the question in question
         bytes32 question_id = keccak256(keccak256(template_id, opening_ts, question), this, timeout, asker, nonce);
         require(realitio_questions[question_id].bounty > 0);
-        require(realitio_questions[question_id].augur_market == address(0));
+        require(realitio_questions[question_id].augur_market == IMarket(0x0));
 
         // Create a market that's already finished
         realitio_questions[question_id].augur_market = latest_universe.createYesNoMarket.value(msg.value)( now, 0, market_token, designated_reporter, 0x0, question, "");
@@ -184,22 +183,21 @@ contract AugurArbitrator is BalanceHolder {
     /// @dev We need to know who gave the final answer and what it was, as they need to be supplied as the arbitration winner if the last answer is right
     /// @dev These just need to be fetched from Realitio, but they can't be fetched directly because to save gas, Realitio doesn't store them 
     /// @dev To get the final answer, we need to reconstruct the final answer using the history hash
-    /// @param market The address of the Augur market which you intend to use to settle this question
+    /// @param question_id The ID of the question you're reporting on
     /// @param last_history_hash The history hash when you gave your answer 
     /// @param last_answer_or_commitment_id The last answer given, or its commitment ID if it was a commitment 
     /// @param last_bond The bond paid in the last answer given
     /// @param last_answerer The account that submitted the last answer (or its commitment)
     /// @param is_commitment Whether the last answer was submitted with commit->reveal
     function reportAnswer(
-        IMarket market, 
+        bytes32 question_id,
         bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment
     ) public {
 
-        bytes32 question_id = augur_markets[market].question_id;
-        require(question_id != bytes32(0));
+        IMarket market = realitio_questions[question_id].augur_market;
 
         // There must be an open bounty
-        require(realitio_questions[question_id].bounty > 0);
+        //require(realitio_questions[question_id].bounty > 0);
 
         bool is_answered; // the answer was provided, not just left as an unrevealed commit
         bytes32 last_answer;
