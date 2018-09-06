@@ -33,7 +33,7 @@ def test_realitio(localFixture, controller, universe):
     question_asker = tester.a1
     question_id = realitiocon.askQuestion(template_id, "Is this thing on?", augurarbcon.address, timeout, opening_ts, nonce, sender=tester.k1)
 
-    realitiocon.submitAnswer(question_id, question_id, 0, sender=tester.k1, value=321)
+    realitiocon.submitAnswer(question_id, longTo32Bytes(long(0)), 0, sender=tester.k1, value=321)
 
     # Validity bond in ETH
     valbond = universe.getOrCacheValidityBond()
@@ -84,18 +84,31 @@ def test_realitio(localFixture, controller, universe):
     market_addr = augurarbcon.realitio_questions(question_id)[2]
     owner_addr = augurarbcon.realitio_questions(question_id)[3]
 
+	# The following is mostly copied from test_reporting.py
+	# We only cover the happy case, assuming the Augur tests will cover other cases
+
+	# TODO: Test various different potential final answers, including invalid
+
     market = localFixture.applySignature('Market', market_addr)
     proceedToDesignatedReporting(localFixture, market)
-    return
 
-    ## Other users cannot
-    #with raises(TransactionFailed):
-    #    time.setTimestamp(newTime + 1, sender=tester.k1)
+    reporter_stake = universe.getOrCacheDesignatedReportStake()
+    rep.transfer(designated_reporter, reporter_stake, sender=tester.k0)
 
-    # We can also increment the time
-    #with AssertLog(localFixture, "TimestampSet", {"newTimestamp": newTime + 1}):
-    #    assert time.incrementTimestamp(1)
-    #assert time.getTimestamp() == controller.getTimestamp() == newTime + 1
+    market.doInitialReport([0, market.getNumTicks()], False, sender=tester.k1)
+
+    # the market is now assigned a fee window
+    newFeeWindowAddress = market.getFeeWindow()
+    assert newFeeWindowAddress
+    feeWindow = localFixture.applySignature('FeeWindow', newFeeWindowAddress)
+
+    # time marches on and the market can be finalized
+    localFixture.contracts["Time"].setTimestamp(feeWindow.getEndTime() + 1)
+    market.finalize()
+
+    augurarbcon.reportAnswer(question_id, longTo32Bytes(long(0)), longTo32Bytes(long(0)), 321, tester.a1, False)
+    ans = realitiocon.getFinalAnswer(question_id)
+    ans == 0
 
 
 @fixture(scope="session")
