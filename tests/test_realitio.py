@@ -81,9 +81,10 @@ def test_realitio(localFixture, controller, universe):
     with raises(TransactionFailed):
         augurarbcon.createMarket("Is this thing on?", timeout, opening_ts, question_asker, nonce, designated_reporter, value=valbond)
 
+    market_addr = augurarbcon.realitio_questions(question_id)[2]
+    owner_addr = augurarbcon.realitio_questions(question_id)[3]
 
-
-    return
+    market = localFixture.applySignature('Market', market_addr)
     proceedToDesignatedReporting(localFixture, market)
     return
 
