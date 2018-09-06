@@ -97,6 +97,7 @@ contract AugurArbitrator is BalanceHolder {
         // Make sure the parameters provided match the question in question
         bytes32 question_id = keccak256(keccak256(template_id, opening_ts, question), this, timeout, asker, nonce);
         require(realitio_questions[question_id].bounty > 0);
+        require(realitio_questions[question_id].augur_market == address(0));
 
         // Create a market that's already finished
         realitio_questions[question_id].augur_market = latest_universe.createYesNoMarket.value(msg.value)( now, 0, market_token, designated_reporter, 0x0, question, "");

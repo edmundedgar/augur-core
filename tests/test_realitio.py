@@ -76,17 +76,15 @@ def test_realitio(localFixture, controller, universe):
 
     augurarbcon.createMarket("Is this thing on?", timeout, opening_ts, question_asker, nonce, designated_reporter, value=valbond)
 
+    # You can only do this once per question
+    rep.transfer(augurarbcon.address, noshowbond, sender=tester.k0)
+    with raises(TransactionFailed):
+        augurarbcon.createMarket("Is this thing on?", timeout, opening_ts, question_asker, nonce, designated_reporter, value=valbond)
+
+
+
     return
     proceedToDesignatedReporting(localFixture, market)
-
-
-
-    # TODO: Implement this?
-    # You can only do this once per question
-    # rep.transfer(augurarbcon.address, noshowbond, sender=tester.k0)
-    # with raises(TransactionFailed):
-    #    augurarbcon.createMarket(question_id, "Is this thing on?", 1, 0, tester.a1, 0, tester.a1, value=valbond)
-
     return
 
     ## Other users cannot
