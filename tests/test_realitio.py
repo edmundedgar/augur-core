@@ -8,29 +8,33 @@ from ethereum.utils import ecsign, sha3, normalize_key, int_to_32bytearray, byte
 
 from reporting_utils import proceedToDesignatedReporting, proceedToInitialReporting, proceedToNextRound, proceedToFork, finalizeFork
 
+REALITIO_YES = longTo32Bytes(long(1))
+REALITIO_NO  = longTo32Bytes(long(0))
+REALITIO_INVALID = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".decode('hex')
+
 def bytes32ToHexString(bts):
     return longToHexString(bytesToLong(bts), 64)
 
 def test_realitio_true_last_correct(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, longTo32Bytes(long(1)), longTo32Bytes(long(0)), True)
+	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_NO, True)
 
 def test_realitio_true_last_incorrect(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, longTo32Bytes(long(0)), longTo32Bytes(long(1)), True)
+	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_YES, True)
 
 def test_realitio_false_last_correct(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, longTo32Bytes(long(0)), longTo32Bytes(long(1)), False)
+	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_YES, False)
 
 def test_realitio_false_last_incorrect(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, longTo32Bytes(long(0)), longTo32Bytes(long(1)), False)
+	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_NO, False)
 
 def test_realitio_invalid_last_correct(localFixture, controller, universe):
-    pass
+	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_INVALID, REALITIO_NO, False)
 
 def test_realitio_invalid_last_incorrect_true(localFixture, controller, universe):
-    pass
+	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_INVALID, False)
 
 def test_realitio_invalid_last_incorrect_false(localFixture, controller, universe):
-    pass
+	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_INVALID, False)
 
 	#realitiocon = _test_answer_set(localFixture, controller, universe, longTo32Bytes(long(1)), longTo32Bytes(long(0)), False)
 	#realitiocon = _test_answer_set(localFixture, controller, universe, longTo32Bytes(long(1)), longTo32Bytes(long(0)), False)
