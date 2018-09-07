@@ -178,6 +178,30 @@ contract AugurArbitrator is BalanceHolder {
 
     }
 
+    /// @notice Get the answer from the Augur market and map it to a Realitio value
+    /// @param market The Augur market
+    function realitioAnswerFromAugurMarket(
+       IMarket market
+    ) public view returns (bytes32) {
+        bytes32 answer;
+        if (market.isInvalid()) {
+            answer = REALITIO_INVALID;
+        } else {
+            uint256 no_val = market.getWinningPayoutNumerator(AUGUR_NO_INDEX);
+            uint256 yes_val = market.getWinningPayoutNumerator(AUGUR_YES_INDEX);
+            if (yes_val == no_val) {
+                answer = REALITIO_INVALID;
+            } else {
+                if (yes_val > no_val) {
+                    answer = REALITIO_YES;
+                } else {
+                    answer = REALITIO_NO;
+                }
+            }
+        }
+        return answer;
+    }
+
     /// @notice Report the answer from a finalized Augur market to a Realitio contract with a question awaiting arbitration
     /// @dev Pays the arbitration bounty to whoever created the Augur market. Probably the same person will call this function, but they don't have to.
     /// @dev We need to know who gave the final answer and what it was, as they need to be supplied as the arbitration winner if the last answer is right
@@ -197,7 +221,7 @@ contract AugurArbitrator is BalanceHolder {
         IMarket market = realitio_questions[question_id].augur_market;
 
         // There must be an open bounty
-        //require(realitio_questions[question_id].bounty > 0);
+        require(realitio_questions[question_id].bounty > 0);
 
         bool is_answered; // the answer was provided, not just left as an unrevealed commit
         bytes32 last_answer;
@@ -205,23 +229,7 @@ contract AugurArbitrator is BalanceHolder {
 
         require(market.isFinalized());
 
-        bytes32 answer;
-        if (market.isInvalid()) {
-            answer = REALITIO_INVALID;
-        } else {
-            uint256 no_val = market.getWinningPayoutNumerator(AUGUR_NO_INDEX);
-            uint256 yes_val = market.getWinningPayoutNumerator(AUGUR_YES_INDEX);
-            if (yes_val == no_val) {
-                answer = REALITIO_INVALID;
-            } else {
-                if (yes_val > no_val) {
-                    answer = REALITIO_YES;
-                } else {
-                    answer = REALITIO_NO;
-                }
-            }
-        }
-
+        bytes32 answer = realitioAnswerFromAugurMarket(market);
         address winner;
         if (is_answered && last_answer == answer) {
             winner = last_answerer;

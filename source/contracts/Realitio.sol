@@ -493,7 +493,6 @@ contract Realitio is BalanceHolder {
     ) 
         stateFinalized(question_id)
     public {
-
         require(history_hashes.length > 0);
 
         // These are only set if we split our claim over multiple transactions.
