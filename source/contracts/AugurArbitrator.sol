@@ -47,11 +47,6 @@ contract AugurArbitrator is BalanceHolder {
         address owner;
     }
 
-    struct AugurMarket {
-        bytes32 question_id; // The question the market answers
-        address owner; // The address that created the market and should be paid if it resolves the question
-    }
-
     mapping(bytes32 => RealitioQuestion) public realitio_questions;
 
     function initialize(IRealitio _realitio, uint256 _template_id, uint256 _dispute_fee, IUniverse _genesis_universe, ICash _market_token) 
@@ -145,14 +140,14 @@ contract AugurArbitrator is BalanceHolder {
         bool is_pending_arbitration;
         bytes32 history_hash;
         (is_pending_arbitration, history_hash) = _historyVerificationData(question_id);
+    
+        require(history_hash == keccak256(last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment));
+        require(is_pending_arbitration);
 
         // If the question hasn't been answered, nobody is ever right
         if (history_hash == bytes32(0)) {
             return (false, bytes32(0));
         }
-
-        require(history_hash == keccak256(last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment));
-        require(is_pending_arbitration);
 
         bytes32 last_answer;
         bool is_answered = true;
