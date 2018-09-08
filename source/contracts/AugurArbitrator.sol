@@ -102,8 +102,10 @@ contract AugurArbitrator is BalanceHolder {
     /// @dev Filters the question struct from Realitio to stuff we need
     /// @dev Broken out into its own function to avoid stack depth limitations
     /// @param question_id The realitio question
-    function _historyVerificationData(bytes32 question_id)
-    internal view returns (bool, bytes32) {
+    function _verifyInput(
+        bytes32 question_id, 
+        bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment
+    ) internal view returns (bool, bytes32) {
         bool is_pending_arbitration;
         bytes32 history_hash;
         (
@@ -118,7 +120,20 @@ contract AugurArbitrator is BalanceHolder {
             history_hash,
             
         ) = realitio.questions(question_id);
-        return (is_pending_arbitration, history_hash);
+
+        require(is_pending_arbitration);
+        
+        if (history_hash == bytes32(0x0)) {
+            // If there's no answer, require everything else to be empty
+            // ...although we only really use the last_bond
+            require(last_bond == 0);
+            require(last_history_hash == bytes32(0x0));
+            require(last_answer_or_commitment_id == bytes32(0x0));
+            require(last_answerer == address(0));
+            require(!is_commitment);
+        } else {
+            require(history_hash == keccak256(last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment));
+        }
 
     }
 
@@ -132,20 +147,16 @@ contract AugurArbitrator is BalanceHolder {
     /// @param last_bond The bond paid in the last answer given
     /// @param last_answerer The account that submitted the last answer (or its commitment)
     /// @param is_commitment Whether the last answer was submitted with commit->reveal
-    function _verifiedAnswerData(
+    function _answerData(
         bytes32 question_id, 
         bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment
     ) internal view returns (bool, bytes32) {
     
         bool is_pending_arbitration;
         bytes32 history_hash;
-        (is_pending_arbitration, history_hash) = _historyVerificationData(question_id);
-    
-        require(history_hash == keccak256(last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment));
-        require(is_pending_arbitration);
 
         // If the question hasn't been answered, nobody is ever right
-        if (history_hash == bytes32(0)) {
+        if (last_bond == 0) {
             return (false, bytes32(0));
         }
 
@@ -220,7 +231,9 @@ contract AugurArbitrator is BalanceHolder {
 
         bool is_answered; // the answer was provided, not just left as an unrevealed commit
         bytes32 last_answer;
-        (is_answered, last_answer) = _verifiedAnswerData(question_id, last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment);  
+
+        _verifyInput(question_id, last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment);
+        (is_answered, last_answer) = _answerData(question_id, last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment);  
 
         require(market.isFinalized());
 
