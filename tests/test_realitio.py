@@ -1,11 +1,7 @@
 from ethereum.tools import tester
 from ethereum.tools.tester import ABIContract, TransactionFailed
 from pytest import fixture, raises
-from utils import longTo32Bytes, PrintGasUsed, fix, bytesToLong, bytesToHexString, stringToBytes, longToHexString
-from datetime import timedelta
-from os import path
-from ethereum.utils import ecsign, sha3, normalize_key, int_to_32bytearray, bytearray_to_bytestr, zpad
-
+from utils import longTo32Bytes, bytesToLong, bytesToHexString, stringToBytes, longToHexString
 from reporting_utils import proceedToDesignatedReporting, proceedToInitialReporting, proceedToNextRound, proceedToFork, finalizeFork
 
 REALITIO_YES = longTo32Bytes(long(1))
@@ -16,25 +12,25 @@ def bytes32ToHexString(bts):
     return longToHexString(bytesToLong(bts), 64)
 
 def test_realitio_true_last_correct(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_NO, True)
+	_test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_NO, True)
 
 def test_realitio_true_last_incorrect(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_YES, True)
+	_test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_YES, True)
 
 def test_realitio_false_last_correct(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_YES, False)
+	_test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_YES, False)
 
 def test_realitio_false_last_incorrect(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_NO, False)
+	_test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_NO, False)
 
 def test_realitio_invalid_last_correct(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_INVALID, REALITIO_NO, False)
+	_test_answer_set(localFixture, controller, universe, REALITIO_INVALID, REALITIO_NO, False)
 
 def test_realitio_invalid_last_incorrect_true(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_INVALID, False)
+	_test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_INVALID, False)
 
 def test_realitio_invalid_last_incorrect_false(localFixture, controller, universe):
-	realitiocon = _test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_INVALID, False)
+	_test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_INVALID, False)
 
 def _test_answer_set(localFixture, controller, universe, realitio_answer_final, realitio_answer_wrong, augur_bool):
 
@@ -217,8 +213,6 @@ def _test_answer_set(localFixture, controller, universe, realitio_answer_final, 
 
     assert (claimer_end_bal - claimer_start_bal) > 0
 
-    return realitiocon
-
 
 @fixture(scope="session")
 def localSnapshot(fixture, kitchenSinkSnapshot):
@@ -234,10 +228,6 @@ def localFixture(fixture, localSnapshot):
 @fixture
 def controller(localFixture, kitchenSinkSnapshot):
     return localFixture.contracts['Controller']
-
-BASE_PATH = path.dirname(path.abspath(__file__))
-def resolveRelativePath(relativeFilePath):
-    return path.abspath(path.join(BASE_PATH, relativeFilePath))
 
 @fixture
 def universe(localFixture, kitchenSinkSnapshot):
