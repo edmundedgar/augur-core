@@ -24,13 +24,13 @@ def test_realitio_false_last_incorrect(localFixture, controller, universe):
 	_test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_NO, False)
 
 def test_realitio_invalid_last_correct(localFixture, controller, universe):
-	_test_answer_set(localFixture, controller, universe, REALITIO_INVALID, REALITIO_NO, False)
+	_test_answer_set(localFixture, controller, universe, REALITIO_INVALID, REALITIO_NO, None)
 
 def test_realitio_invalid_last_incorrect_true(localFixture, controller, universe):
-	_test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_INVALID, False)
+	_test_answer_set(localFixture, controller, universe, REALITIO_YES, REALITIO_INVALID, None)
 
 def test_realitio_invalid_last_incorrect_false(localFixture, controller, universe):
-	_test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_INVALID, False)
+	_test_answer_set(localFixture, controller, universe, REALITIO_NO, REALITIO_INVALID, None)
 
 def _test_answer_set(localFixture, controller, universe, realitio_answer_final, realitio_answer_wrong, augur_bool):
 
@@ -154,7 +154,7 @@ def _test_answer_set(localFixture, controller, universe, realitio_answer_final, 
 
     augur_answer_in_realitio = None
     if augur_bool is None:
-        market.doInitialReport([0, 0], True, sender=k_reporter)
+        market.doInitialReport([market.getNumTicks()/2, market.getNumTicks()/2], True, sender=k_reporter)
         augur_answer_realitio_hex = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     elif augur_bool:
         market.doInitialReport([0, market.getNumTicks()], False, sender=k_reporter)
