@@ -1,12 +1,17 @@
+# -*- coding: utf-8 -*-
+
 from ethereum.tools import tester
 from ethereum.tools.tester import ABIContract, TransactionFailed
 from pytest import fixture, raises
-from utils import longTo32Bytes, bytesToLong, bytesToHexString, stringToBytes, longToHexString
+from utils import longTo32Bytes, bytesToLong, bytesToHexString, stringToBytes, longToHexString, AssertLog
 from reporting_utils import proceedToDesignatedReporting, proceedToInitialReporting, proceedToNextRound, proceedToFork, finalizeFork
 
 REALITIO_YES = longTo32Bytes(long(1))
 REALITIO_NO  = longTo32Bytes(long(0))
 REALITIO_INVALID = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".decode('hex')
+
+REALITIO_DELIMITER = '␟'
+question_text = "Is this thing on?" + REALITIO_DELIMITER + 'blockchain'
 
 def bytes32ToHexString(bts):
     return longToHexString(bytesToLong(bts), 64)
@@ -68,7 +73,7 @@ def _test_answer_set(localFixture, controller, universe, realitio_answer_final, 
 
     realitiocon = localFixture.uploadAndAddToController("../source/contracts/Realitio.sol", lookupKey="Realitio")
 
-    question_id = realitiocon.askQuestion(template_id, "Is this thing on?", augurarbcon.address, timeout, opening_ts, nonce, sender=k_asker)
+    question_id = realitiocon.askQuestion(template_id, question_text, augurarbcon.address, timeout, opening_ts, nonce, sender=k_asker)
 
     answer_hist_hash = []
     answer_hist_addr = []
@@ -112,15 +117,16 @@ def _test_answer_set(localFixture, controller, universe, realitio_answer_final, 
     with raises(TransactionFailed):
         augurarbcon.requestArbitration(question_id, 320, value=12345, sender=k_arb_requester)
 
+
     # Revert if you haven't yet requested arbitration
     with raises(TransactionFailed):
-        augurarbcon.createMarket("Is this thing on?", timeout, opening_ts, a_asker, nonce, a_reporter, value=valbond)
+        augurarbcon.createMarket(question_text, timeout, opening_ts, a_asker, nonce, a_reporter, value=valbond)
 
     augurarbcon.requestArbitration(question_id, 0, value=12345, sender=k_arb_requester)
 
     # Fail if the contract doesn't yet own sufficient REP
     with raises(TransactionFailed):
-        augurarbcon.createMarket("Is this thing on?", timeout, opening_ts, a_asker, nonce, a_reporter, value=valbond)
+        augurarbcon.createMarket(question_text, timeout, opening_ts, a_asker, nonce, a_reporter, value=valbond)
 
     # Make sure the arbitrator contract has some REP for the validity bond
     # TODO: Work out how to prevent someone else from spending the REP before you can use it
@@ -131,12 +137,19 @@ def _test_answer_set(localFixture, controller, universe, realitio_answer_final, 
     # This will do some checks then call:
     # IMarket market = universe.createYesNoMarket.value(msg.value)( now+1, 0, market_token, a_reporter, 0x0, question, "");
 
-    augurarbcon.createMarket("Is this thing on?", timeout, opening_ts, a_asker, nonce, a_reporter, value=valbond)
+    marketCreatedLog = {
+        "description": question_text,
+        "marketCreationFee": universe.getOrCacheMarketCreationCost(),
+        #"marketCreator": bytesToHexString(augurarbcon.address),
+    }
+
+    with AssertLog(localFixture, "MarketCreated", marketCreatedLog):
+        augurarbcon.createMarket(question_text, timeout, opening_ts, a_asker, nonce, a_reporter, value=valbond)
 
     # You can only do this once per question
     rep.transfer(augurarbcon.address, noshowbond, sender=k_rep_faucet)
     with raises(TransactionFailed):
-        augurarbcon.createMarket("Is this thing on?", timeout, opening_ts, a_asker, nonce, a_reporter, value=valbond)
+        augurarbcon.createMarket(question_text, timeout, opening_ts, a_asker, nonce, a_reporter, value=valbond)
 
     market_addr = augurarbcon.realitio_questions(question_id)[2]
     owner_addr = augurarbcon.realitio_questions(question_id)[3]
