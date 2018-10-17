@@ -3,6 +3,8 @@ pragma solidity ^0.4.20;
 import 'BalanceHolder.sol';
 import 'IRealitio.sol';
 
+import 'strings.sol';
+
 contract ICash{}
 
 contract IMarket {
@@ -19,6 +21,8 @@ contract IUniverse {
 
 contract AugurArbitrator is BalanceHolder {
 
+    using strings for *;
+
     IRealitio public realitio;
     uint256 public template_id;
     uint256 dispute_fee;
@@ -32,6 +36,7 @@ contract AugurArbitrator is BalanceHolder {
     bytes32 constant REALITIO_NO      = 0x0000000000000000000000000000000000000000000000000000000000000000;
     uint256 constant AUGUR_YES_INDEX  = 1;
     uint256 constant AUGUR_NO_INDEX   = 0;
+    string constant REALITIO_DELIMITER = '␟';
 
     event LogRequestArbitration(
         bytes32 indexed question_id,
@@ -74,9 +79,22 @@ contract AugurArbitrator is BalanceHolder {
         latest_universe = child_universe;
     }
 
+    /// @notice Trim to the part before the initial delimiter
+    /// @dev The first item in this template is the title.
+    /// @dev Subsequent items (category, lang) aren't needed in Augur
+    function _trimQuestion(string q) 
+    internal pure returns (string) {
+        return q.toSlice().split(REALITIO_DELIMITER.toSlice()).toString();
+    }
+
+    function _callAugurMarketCreate(bytes32 question_id, string question, address designated_reporter) 
+    internal {
+        realitio_questions[question_id].augur_market = latest_universe.createYesNoMarket.value(msg.value)( now, 0, market_token, designated_reporter, 0x0, _trimQuestion(question), "");
+        realitio_questions[question_id].owner = msg.sender;
+    }
+
     /// @notice Create a market in Augur and store the creator as its owner
-    /// @dev Anyone can all this, and calling this will give them the rights to claim the bounty
-    /// @dev If people want to create multiple markets for the same question, they can, and the first to resolve can get paid
+    /// @dev Anyone can call this, and calling this will give them the rights to claim the bounty
     /// @dev They will need have sent this contract some REP for the no-show bond.
     /// @param question The question content // TODO Check if realitio format and the Augur format, see if we need to convert anything
     /// @param timeout The timeout between rounds, set when the question was created
@@ -94,8 +112,7 @@ contract AugurArbitrator is BalanceHolder {
         require(realitio_questions[question_id].augur_market == IMarket(0x0));
 
         // Create a market that's already finished
-        realitio_questions[question_id].augur_market = latest_universe.createYesNoMarket.value(msg.value)( now, 0, market_token, designated_reporter, 0x0, question, "");
-        realitio_questions[question_id].owner = msg.sender;
+        _callAugurMarketCreate(question_id, question, designated_reporter);
     }
 
     /// @notice Return data needed to verify the last history item
@@ -233,6 +250,7 @@ contract AugurArbitrator is BalanceHolder {
         bytes32 last_answer;
 
         _verifyInput(question_id, last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment);
+
         (is_answered, last_answer) = _answerData(question_id, last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment);  
 
         require(market.isFinalized());

@@ -11,7 +11,8 @@ REALITIO_NO  = longTo32Bytes(long(0))
 REALITIO_INVALID = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".decode('hex')
 
 REALITIO_DELIMITER = '␟'
-question_text = "Is this thing on?" + REALITIO_DELIMITER + 'blockchain'
+question_short= "Is this thing on?"
+question_text = question_short + REALITIO_DELIMITER + 'blockchain'
 
 def bytes32ToHexString(bts):
     return longToHexString(bytesToLong(bts), 64)
@@ -138,7 +139,7 @@ def _test_answer_set(localFixture, controller, universe, realitio_answer_final, 
     # IMarket market = universe.createYesNoMarket.value(msg.value)( now+1, 0, market_token, a_reporter, 0x0, question, "");
 
     marketCreatedLog = {
-        "description": question_text,
+        "description": question_short,
         "marketCreationFee": universe.getOrCacheMarketCreationCost(),
         #"marketCreator": bytesToHexString(augurarbcon.address),
     }
