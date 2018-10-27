@@ -40,7 +40,7 @@ def test_realitio_invalid_last_incorrect_false(localFixture, controller, univers
 
 def _test_answer_set(localFixture, controller, universe, realitio_answer_final, realitio_answer_wrong, augur_bool):
 
-    augarb = controller.lookup("AugurArbitrator")
+    augarb = controller.lookup("RealitioAugurArbitrator")
     realitio = controller.lookup("Realitio")
     cash = controller.lookup("Cash")
 
@@ -64,7 +64,7 @@ def _test_answer_set(localFixture, controller, universe, realitio_answer_final, 
     nonce = 987654321 # Usually 0
     timeout = 1
 
-    augurarbcon = localFixture.uploadAndAddToController("../source/contracts/AugurArbitrator.sol", lookupKey="AugurArbitrator")
+    augurarbcon = localFixture.uploadAndAddToController("../source/contracts/RealitioAugurArbitrator.sol", lookupKey="RealitioAugurArbitrator")
 
     augurarbcon.initialize(realitio, template_id, 12345, universe.address, cash);
     assert augurarbcon.getDisputeFee("0x0") == 12345 # All question ids are the same

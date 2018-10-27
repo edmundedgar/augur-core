@@ -19,7 +19,7 @@ contract IUniverse {
     payable returns (IMarket _newMarket); 
 }
 
-contract AugurArbitrator is BalanceHolder {
+contract RealitioAugurArbitrator is BalanceHolder {
 
     using strings for *;
 
