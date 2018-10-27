@@ -140,17 +140,7 @@ contract AugurArbitrator is BalanceHolder {
 
         require(is_pending_arbitration);
         
-        if (history_hash == bytes32(0x0)) {
-            // If there's no answer, require everything else to be empty
-            // ...although we only really use the last_bond
-            require(last_bond == 0);
-            require(last_history_hash == bytes32(0x0));
-            require(last_answer_or_commitment_id == bytes32(0x0));
-            require(last_answerer == address(0));
-            require(!is_commitment);
-        } else {
-            require(history_hash == keccak256(last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment));
-        }
+        require(history_hash == keccak256(last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment));
 
     }
 
