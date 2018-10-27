@@ -28,7 +28,6 @@ contract RealitioAugurArbitrator is BalanceHolder {
     uint256 dispute_fee;
 
     ICash public market_token;
-    mapping(address=>bool) public winning_universes;
     IUniverse public latest_universe;
 
     bytes32 constant REALITIO_INVALID = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
@@ -63,19 +62,16 @@ contract RealitioAugurArbitrator is BalanceHolder {
 
         template_id = _template_id;
         realitio = _realitio;
-        winning_universes[_genesis_universe] = true;
         latest_universe = _genesis_universe;
         market_token = _market_token;
 
     }
 
-    /// @notice Register a winning child universe after a fork
+    /// @notice Register a new child universe after a fork
     /// @dev Anyone can create Augur universes but the "correct" ones should be in a single line from the official genesis universe
-    function addForkedUniverse(address parent) 
+    function addForkedUniverse() 
     external {
-        require(winning_universes[parent]);
-        IUniverse child_universe = IUniverse(parent).getWinningChildUniverse();
-        winning_universes[address(child_universe)] = true;
+        IUniverse child_universe = IUniverse(latest_universe).getWinningChildUniverse();
         latest_universe = child_universe;
     }
 
