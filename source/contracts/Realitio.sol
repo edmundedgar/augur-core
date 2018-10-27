@@ -1,13 +1,14 @@
-pragma solidity ^0.4.18;
+pragma solidity 0.4.25;
 
-import 'SafeMath.sol';
-import 'SafeMath32.sol';
+import 'RealitioSafeMath256.sol';
+import 'RealitioSafeMath32.sol';
 import 'BalanceHolder.sol';
+
 
 contract Realitio is BalanceHolder {
 
-    using SafeMath for uint256;
-    using SafeMath32 for uint32;
+    using RealitioSafeMath256 for uint256;
+    using RealitioSafeMath32 for uint32;
 
     address constant NULL_ADDRESS = address(0);
 
@@ -121,12 +122,12 @@ contract Realitio is BalanceHolder {
     mapping(uint256 => uint256) public templates;
     mapping(uint256 => bytes32) public template_hashes;
     mapping(bytes32 => Question) public questions;
-    mapping(bytes32 => Claim) question_claims;
+    mapping(bytes32 => Claim) public question_claims;
     mapping(bytes32 => Commitment) public commitments;
     mapping(address => uint256) public arbitrator_question_fees; 
 
     modifier onlyArbitrator(bytes32 question_id) {
-        require(msg.sender == questions[question_id].arbitrator);
+        require(msg.sender == questions[question_id].arbitrator, "msg.sender must be arbitrator");
         _;
     }
 
@@ -135,66 +136,66 @@ contract Realitio is BalanceHolder {
     }
 
     modifier stateNotCreated(bytes32 question_id) {
-        require(questions[question_id].timeout == 0);
+        require(questions[question_id].timeout == 0, "question must not exist");
         _;
     }
 
     modifier stateOpen(bytes32 question_id) {
-        require(questions[question_id].timeout > 0); // Check existence
-        require(!questions[question_id].is_pending_arbitration);
+        require(questions[question_id].timeout > 0, "question must exist");
+        require(!questions[question_id].is_pending_arbitration, "question must not be pending arbitration");
         uint32 finalize_ts = questions[question_id].finalize_ts;
-        require(finalize_ts == UNANSWERED || finalize_ts > uint32(now));
+        require(finalize_ts == UNANSWERED || finalize_ts > uint32(now), "finalization deadline must not have passed");
         uint32 opening_ts = questions[question_id].opening_ts;
-        require(opening_ts == 0 || opening_ts <= uint32(now)); 
+        require(opening_ts == 0 || opening_ts <= uint32(now), "opening date must have passed"); 
         _;
     }
 
     modifier statePendingArbitration(bytes32 question_id) {
-        require(questions[question_id].is_pending_arbitration);
+        require(questions[question_id].is_pending_arbitration, "question must be pending arbitration");
         _;
     }
 
     modifier stateOpenOrPendingArbitration(bytes32 question_id) {
-        require(questions[question_id].timeout > 0); // Check existence
+        require(questions[question_id].timeout > 0, "question must exist");
         uint32 finalize_ts = questions[question_id].finalize_ts;
-        require(finalize_ts == UNANSWERED || finalize_ts > uint32(now));
+        require(finalize_ts == UNANSWERED || finalize_ts > uint32(now), "finalization dealine must not have passed");
         uint32 opening_ts = questions[question_id].opening_ts;
-        require(opening_ts == 0 || opening_ts <= uint32(now)); 
+        require(opening_ts == 0 || opening_ts <= uint32(now), "opening date must have passed"); 
         _;
     }
 
     modifier stateFinalized(bytes32 question_id) {
-        require(isFinalized(question_id));
+        require(isFinalized(question_id), "question must be finalized");
         _;
     }
 
     modifier bondMustBeZero() {
-        require(msg.value == 0);
+        require(msg.value == 0, "bond must be zero");
         _;
     }
 
     modifier bondMustDouble(bytes32 question_id) {
-        require(msg.value > 0); 
-        require(msg.value >= (questions[question_id].bond.mul(2)));
+        require(msg.value > 0, "bond must be positive"); 
+        require(msg.value >= (questions[question_id].bond.mul(2)), "bond must be double at least previous bond");
         _;
     }
 
     modifier previousBondMustNotBeatMaxPrevious(bytes32 question_id, uint256 max_previous) {
         if (max_previous > 0) {
-            require(questions[question_id].bond <= max_previous);
+            require(questions[question_id].bond <= max_previous, "bond must exceed max_previous");
         }
         _;
     }
 
     /// @notice Constructor, sets up some initial templates
     /// @dev Creates some generalized templates for different question types used in the DApp.
-    function Realitio() 
+    constructor() 
     public {
-        createTemplate('{"title": "%s", "type": "bool", "category": "%s"}');
-        createTemplate('{"title": "%s", "type": "uint", "decimals": 18, "category": "%s"}');
-        createTemplate('{"title": "%s", "type": "single-select", "outcomes": [%s], "category": "%s"}');
-        createTemplate('{"title": "%s", "type": "multiple-select", "outcomes": [%s], "category": "%s"}');
-        createTemplate('{"title": "%s", "type": "datetime", "category": "%s"}');
+        createTemplate('{"title": "%s", "type": "bool", "category": "%s", "lang": "%s"}');
+        createTemplate('{"title": "%s", "type": "uint", "decimals": 18, "category": "%s", "lang": "%s"}');
+        createTemplate('{"title": "%s", "type": "single-select", "outcomes": [%s], "category": "%s", "lang": "%s"}');
+        createTemplate('{"title": "%s", "type": "multiple-select", "outcomes": [%s], "category": "%s", "lang": "%s"}');
+        createTemplate('{"title": "%s", "type": "datetime", "category": "%s", "lang": "%s"}');
     }
 
     /// @notice Function for arbitrator to set an optional per-question fee. 
@@ -204,7 +205,7 @@ contract Realitio is BalanceHolder {
         stateAny() 
     external {
         arbitrator_question_fees[msg.sender] = fee;
-        LogSetQuestionFee(msg.sender, fee);
+        emit LogSetQuestionFee(msg.sender, fee);
     }
 
     /// @notice Create a reusable template, which should be a JSON document.
@@ -217,8 +218,8 @@ contract Realitio is BalanceHolder {
     public returns (uint256) {
         uint256 id = nextTemplateID;
         templates[id] = block.number;
-        template_hashes[id] = keccak256(content);
-        LogNewTemplate(id, msg.sender, content);
+        template_hashes[id] = keccak256(abi.encodePacked(content));
+        emit LogNewTemplate(id, msg.sender, content);
         nextTemplateID = id.add(1);
         return id;
     }
@@ -255,13 +256,13 @@ contract Realitio is BalanceHolder {
         // stateNotCreated is enforced by the internal _askQuestion
     public payable returns (bytes32) {
 
-        require(templates[template_id] > 0); // Template must exist
+        require(templates[template_id] > 0, "template must exist");
 
-        bytes32 content_hash = keccak256(template_id, opening_ts, question);
-        bytes32 question_id = keccak256(content_hash, arbitrator, timeout, msg.sender, nonce);
+        bytes32 content_hash = keccak256(abi.encodePacked(template_id, opening_ts, question));
+        bytes32 question_id = keccak256(abi.encodePacked(content_hash, arbitrator, timeout, msg.sender, nonce));
 
         _askQuestion(question_id, content_hash, arbitrator, timeout, opening_ts);
-        LogNewQuestion(question_id, msg.sender, template_id, question, content_hash, arbitrator, timeout, opening_ts, nonce, now);
+        emit LogNewQuestion(question_id, msg.sender, template_id, question, content_hash, arbitrator, timeout, opening_ts, nonce, now);
 
         return question_id;
     }
@@ -271,9 +272,9 @@ contract Realitio is BalanceHolder {
     internal {
 
         // A timeout of 0 makes no sense, and we will use this to check existence
-        require(timeout > 0); 
-        require(timeout < 365 days); 
-        require(arbitrator != NULL_ADDRESS);
+        require(timeout > 0, "timeout must be positive"); 
+        require(timeout < 365 days, "timeout must be less than 365 days"); 
+        require(arbitrator != NULL_ADDRESS, "arbitrator must be set");
 
         uint256 bounty = msg.value;
 
@@ -284,7 +285,7 @@ contract Realitio is BalanceHolder {
         // This would allow more sophisticated pricing, question whitelisting etc.
         if (msg.sender != arbitrator) {
             uint256 question_fee = arbitrator_question_fees[arbitrator];
-            require(bounty >= question_fee); 
+            require(bounty >= question_fee, "ETH provided must cover question fee"); 
             bounty = bounty.sub(question_fee);
             balanceOf[arbitrator] = balanceOf[arbitrator].add(question_fee);
         }
@@ -304,7 +305,7 @@ contract Realitio is BalanceHolder {
         stateOpen(question_id)
     external payable {
         questions[question_id].bounty = questions[question_id].bounty.add(msg.value);
-        LogFundAnswerBounty(question_id, msg.value, questions[question_id].bounty, msg.sender);
+        emit LogFundAnswerBounty(question_id, msg.value, questions[question_id].bounty, msg.sender);
     }
 
     /// @notice Submit an answer for a question.
@@ -337,10 +338,10 @@ contract Realitio is BalanceHolder {
         previousBondMustNotBeatMaxPrevious(question_id, max_previous)
     external payable {
 
-        bytes32 commitment_id = keccak256(question_id, answer_hash, msg.value);
+        bytes32 commitment_id = keccak256(abi.encodePacked(question_id, answer_hash, msg.value));
         address answerer = (_answerer == NULL_ADDRESS) ? msg.sender : _answerer;
 
-        require(commitments[commitment_id].reveal_ts == COMMITMENT_NON_EXISTENT);
+        require(commitments[commitment_id].reveal_ts == COMMITMENT_NON_EXISTENT, "commitment must not already exist");
 
         uint32 commitment_timeout = questions[question_id].timeout / COMMITMENT_TIMEOUT_RATIO;
         commitments[commitment_id].reveal_ts = uint32(now).add(commitment_timeout);
@@ -363,11 +364,11 @@ contract Realitio is BalanceHolder {
         stateOpenOrPendingArbitration(question_id)
     external {
 
-        bytes32 answer_hash = keccak256(answer, nonce);
-        bytes32 commitment_id = keccak256(question_id, answer_hash, bond);
+        bytes32 answer_hash = keccak256(abi.encodePacked(answer, nonce));
+        bytes32 commitment_id = keccak256(abi.encodePacked(question_id, answer_hash, bond));
 
-        require(!commitments[commitment_id].is_revealed);
-        require(commitments[commitment_id].reveal_ts > uint32(now)); // Reveal deadline must not have passed
+        require(!commitments[commitment_id].is_revealed, "commitment must not have been revealed yet");
+        require(commitments[commitment_id].reveal_ts > uint32(now), "reveal deadline must not have passed");
 
         commitments[commitment_id].revealed_answer = answer;
         commitments[commitment_id].is_revealed = true;
@@ -376,19 +377,22 @@ contract Realitio is BalanceHolder {
             _updateCurrentAnswer(question_id, answer, questions[question_id].timeout);
         }
 
-        LogAnswerReveal(question_id, msg.sender, answer_hash, answer, nonce, bond);
+        emit LogAnswerReveal(question_id, msg.sender, answer_hash, answer, nonce, bond);
 
     }
 
     function _addAnswerToHistory(bytes32 question_id, bytes32 answer_or_commitment_id, address answerer, uint256 bond, bool is_commitment) 
     internal 
     {
-        bytes32 new_history_hash = keccak256(questions[question_id].history_hash, answer_or_commitment_id, bond, answerer, is_commitment);
+        bytes32 new_history_hash = keccak256(abi.encodePacked(questions[question_id].history_hash, answer_or_commitment_id, bond, answerer, is_commitment));
 
-        questions[question_id].bond = bond;
+        // Update the current bond level, if there's a bond (ie anything except arbitration)
+        if (bond > 0) {
+            questions[question_id].bond = bond;
+        }
         questions[question_id].history_hash = new_history_hash;
 
-        LogNewAnswer(answer_or_commitment_id, question_id, new_history_hash, answerer, bond, now, is_commitment);
+        emit LogNewAnswer(answer_or_commitment_id, question_id, new_history_hash, answerer, bond, now, is_commitment);
     }
 
     function _updateCurrentAnswer(bytes32 question_id, bytes32 answer, uint32 timeout_secs)
@@ -407,8 +411,9 @@ contract Realitio is BalanceHolder {
         stateOpen(question_id)
         previousBondMustNotBeatMaxPrevious(question_id, max_previous)
     external {
+        require(questions[question_id].bond > 0, "Question must already have an answer when arbitration is requested");
         questions[question_id].is_pending_arbitration = true;
-        LogNotifyOfArbitrationRequest(question_id, requester);
+        emit LogNotifyOfArbitrationRequest(question_id, requester);
     }
 
     /// @notice Submit the answer for a question, for use by the arbitrator.
@@ -425,8 +430,8 @@ contract Realitio is BalanceHolder {
         bondMustBeZero
     external {
 
-        require(answerer != NULL_ADDRESS);
-        LogFinalize(question_id, answer);
+        require(answerer != NULL_ADDRESS, "answerer must be provided");
+        emit LogFinalize(question_id, answer);
 
         questions[question_id].is_pending_arbitration = false;
         _addAnswerToHistory(question_id, answer, answerer, 0, false);
@@ -438,19 +443,29 @@ contract Realitio is BalanceHolder {
     /// @param question_id The ID of the question
     /// @return Return true if finalized
     function isFinalized(bytes32 question_id) 
-    constant public returns (bool) {
+    view public returns (bool) {
         uint32 finalize_ts = questions[question_id].finalize_ts;
         return ( !questions[question_id].is_pending_arbitration && (finalize_ts > UNANSWERED) && (finalize_ts <= uint32(now)) );
+    }
+
+    /// @notice (Deprecated) Return the final answer to the specified question, or revert if there isn't one
+    /// @param question_id The ID of the question
+    /// @return The answer formatted as a bytes32
+    function getFinalAnswer(bytes32 question_id) 
+        stateFinalized(question_id)
+    external view returns (bytes32) {
+        return questions[question_id].best_answer;
     }
 
     /// @notice Return the final answer to the specified question, or revert if there isn't one
     /// @param question_id The ID of the question
     /// @return The answer formatted as a bytes32
-    function getFinalAnswer(bytes32 question_id) 
+    function resultFor(bytes32 question_id) 
         stateFinalized(question_id)
-    external constant returns (bytes32) {
+    external view returns (bytes32) {
         return questions[question_id].best_answer;
     }
+
 
     /// @notice Return the final answer to the specified question, provided it matches the specified criteria.
     /// @dev Reverts if the question is not finalized, or if it does not match the specified criteria.
@@ -465,11 +480,11 @@ contract Realitio is BalanceHolder {
         bytes32 content_hash, address arbitrator, uint32 min_timeout, uint256 min_bond
     ) 
         stateFinalized(question_id)
-    external constant returns (bytes32) {
-        require(content_hash == questions[question_id].content_hash);
-        require(arbitrator == questions[question_id].arbitrator);
-        require(min_timeout <= questions[question_id].timeout);
-        require(min_bond <= questions[question_id].bond);
+    external view returns (bytes32) {
+        require(content_hash == questions[question_id].content_hash, "content hash must match");
+        require(arbitrator == questions[question_id].arbitrator, "arbitrator must match");
+        require(min_timeout <= questions[question_id].timeout, "timeout must be long enough");
+        require(min_bond <= questions[question_id].bond, "bond must be high enough");
         return questions[question_id].best_answer;
     }
 
@@ -493,7 +508,8 @@ contract Realitio is BalanceHolder {
     ) 
         stateFinalized(question_id)
     public {
-        require(history_hashes.length > 0);
+
+        require(history_hashes.length > 0, "at least one history hash entry must be provided");
 
         // These are only set if we split our claim over multiple transactions.
         address payee = question_claims[question_id].payee; 
@@ -550,7 +566,7 @@ contract Realitio is BalanceHolder {
     function _payPayee(bytes32 question_id, address payee, uint256 value) 
     internal {
         balanceOf[payee] = balanceOf[payee].add(value);
-        LogClaim(question_id, payee, value);
+        emit LogClaim(question_id, payee, value);
     }
 
     function _verifyHistoryInputOrRevert(
@@ -558,13 +574,13 @@ contract Realitio is BalanceHolder {
         bytes32 history_hash, bytes32 answer, uint256 bond, address addr
     )
     internal pure returns (bool) {
-        if (last_history_hash == keccak256(history_hash, answer, bond, addr, true) ) {
+        if (last_history_hash == keccak256(abi.encodePacked(history_hash, answer, bond, addr, true)) ) {
             return true;
         }
-        if (last_history_hash == keccak256(history_hash, answer, bond, addr, false) ) {
+        if (last_history_hash == keccak256(abi.encodePacked(history_hash, answer, bond, addr, false)) ) {
             return false;
         } 
-        revert();
+        revert("History input provided did not match the expected hash");
     }
 
     function _processHistoryItem(
@@ -662,4 +678,77 @@ contract Realitio is BalanceHolder {
         }
         withdraw();
     }
+
+    /// @notice Returns the questions's content hash, identifying the question content
+    /// @param question_id The ID of the question 
+    function getContentHash(bytes32 question_id) 
+    public view returns(bytes32) {
+        return questions[question_id].content_hash;
+    }
+
+    /// @notice Returns the arbitrator address for the question
+    /// @param question_id The ID of the question 
+    function getArbitrator(bytes32 question_id) 
+    public view returns(address) {
+        return questions[question_id].arbitrator;
+    }
+
+    /// @notice Returns the timestamp when the question can first be answered
+    /// @param question_id The ID of the question 
+    function getOpeningTS(bytes32 question_id) 
+    public view returns(uint32) {
+        return questions[question_id].opening_ts;
+    }
+
+    /// @notice Returns the timeout in seconds used after each answer
+    /// @param question_id The ID of the question 
+    function getTimeout(bytes32 question_id) 
+    public view returns(uint32) {
+        return questions[question_id].timeout;
+    }
+
+    /// @notice Returns the timestamp at which the question will be/was finalized
+    /// @param question_id The ID of the question 
+    function getFinalizeTS(bytes32 question_id) 
+    public view returns(uint32) {
+        return questions[question_id].finalize_ts;
+    }
+
+    /// @notice Returns whether the question is pending arbitration
+    /// @param question_id The ID of the question 
+    function isPendingArbitration(bytes32 question_id) 
+    public view returns(bool) {
+        return questions[question_id].is_pending_arbitration;
+    }
+
+    /// @notice Returns the current total unclaimed bounty
+    /// @dev Set back to zero once the bounty has been claimed
+    /// @param question_id The ID of the question 
+    function getBounty(bytes32 question_id) 
+    public view returns(uint256) {
+        return questions[question_id].bounty;
+    }
+
+    /// @notice Returns the current best answer
+    /// @param question_id The ID of the question 
+    function getBestAnswer(bytes32 question_id) 
+    public view returns(bytes32) {
+        return questions[question_id].best_answer;
+    }
+
+    /// @notice Returns the history hash of the question 
+    /// @param question_id The ID of the question 
+    /// @dev Updated on each answer, then rewound as each is claimed
+    function getHistoryHash(bytes32 question_id) 
+    public view returns(bytes32) {
+        return questions[question_id].history_hash;
+    }
+
+    /// @notice Returns the highest bond posted so far for a question
+    /// @param question_id The ID of the question 
+    function getBond(bytes32 question_id) 
+    public view returns(uint256) {
+        return questions[question_id].bond;
+    }
+
 }
