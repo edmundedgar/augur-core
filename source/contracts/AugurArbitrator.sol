@@ -123,22 +123,8 @@ contract AugurArbitrator is BalanceHolder {
         bytes32 question_id, 
         bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment
     ) internal view returns (bool, bytes32) {
-        bool is_pending_arbitration;
-        bytes32 history_hash;
-        (
-            ,
-            ,
-            ,
-            ,
-            ,
-            is_pending_arbitration,
-            ,
-            ,
-            history_hash,
-            
-        ) = realitio.questions(question_id);
-
-        require(is_pending_arbitration);
+        require(realitio.isPendingArbitration(question_id));
+        bytes32 history_hash = realitio.getHistoryHash(question_id);
         
         require(history_hash == keccak256(last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment));
 
