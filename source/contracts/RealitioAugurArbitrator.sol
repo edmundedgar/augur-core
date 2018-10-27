@@ -183,7 +183,7 @@ contract RealitioAugurArbitrator is BalanceHolder {
         }
 
         bytes32 last_answer;
-        bool is_answered = true;
+        bool is_answered;
 
         if (is_commitment) {
             uint256 reveal_ts;
@@ -193,6 +193,7 @@ contract RealitioAugurArbitrator is BalanceHolder {
 
             if (is_revealed) {
                 last_answer = revealed_answer;
+                is_answered = true;
             } else {
                 // Shouldn't normally happen, but if the last answerer might still reveal when we are called, bail out and wait for them.
                 require(reveal_ts < uint32(now));
@@ -200,6 +201,7 @@ contract RealitioAugurArbitrator is BalanceHolder {
             }
         } else {
             last_answer = last_answer_or_commitment_id;
+            is_answered = true;
         }
 
         return (is_answered, last_answer);
