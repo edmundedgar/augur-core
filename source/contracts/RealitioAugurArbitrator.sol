@@ -53,13 +53,27 @@ contract RealitioAugurArbitrator is BalanceHolder {
 
     mapping(bytes32 => RealitioQuestion) public realitio_questions;
 
+    modifier onlyInitialized() { 
+        require(dispute_fee > 0);
+        _;
+    }
+
+    modifier onlyUninitialized() { 
+        require(dispute_fee == 0); // uninitialized
+        _;
+    }
+
+    /// @notice Initialize a new contract
     function initialize(IRealitio _realitio, uint256 _template_id, uint256 _dispute_fee, IUniverse _genesis_universe, ICash _market_token) 
+        onlyUninitialized
     external {
 
-        require(dispute_fee == 0); // uninitialized
         require(_dispute_fee > 0);
-        dispute_fee = _dispute_fee;
+        require(_realitio != IRealitio(0x0));
+        require(_genesis_universe != IUniverse(0x0));
+        require(_market_token != ICash(0x0));
 
+        dispute_fee = _dispute_fee;
         template_id = _template_id;
         realitio = _realitio;
         latest_universe = _genesis_universe;
@@ -69,13 +83,16 @@ contract RealitioAugurArbitrator is BalanceHolder {
 
     /// @notice Register a new child universe after a fork
     /// @dev Anyone can create Augur universes but the "correct" ones should be in a single line from the official genesis universe
+    /// @dev If a universe goes into a forking state, someone will need to call this before you can create new markets.
     function addForkedUniverse() 
+        onlyInitialized
     external {
         IUniverse child_universe = IUniverse(latest_universe).getWinningChildUniverse();
         latest_universe = child_universe;
     }
 
-    /// @notice Trim to the part before the initial delimiter
+    /// @notice Trim the realitio question content to the part before the initial delimiter.
+    /// @dev We throw away the subsequent parameters of the question.
     /// @dev The first item in this template is the title.
     /// @dev Subsequent items (category, lang) aren't needed in Augur
     function _trimQuestion(string q) 
@@ -101,7 +118,9 @@ contract RealitioAugurArbitrator is BalanceHolder {
     function createMarket(
         string question, uint32 timeout, uint32 opening_ts, address asker, uint256 nonce,
         address designated_reporter
-    ) external payable {
+    ) 
+        onlyInitialized
+    external payable {
         // Make sure the parameters provided match the question in question
         bytes32 question_id = keccak256(keccak256(template_id, opening_ts, question), this, timeout, asker, nonce);
         require(realitio_questions[question_id].bounty > 0);
@@ -177,7 +196,9 @@ contract RealitioAugurArbitrator is BalanceHolder {
     /// @param market The Augur market
     function realitioAnswerFromAugurMarket(
        IMarket market
-    ) public view returns (bytes32) {
+    ) 
+        onlyInitialized
+    public view returns (bytes32) {
         bytes32 answer;
         if (market.isInvalid()) {
             answer = REALITIO_INVALID;
@@ -211,7 +232,9 @@ contract RealitioAugurArbitrator is BalanceHolder {
     function reportAnswer(
         bytes32 question_id,
         bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment
-    ) public {
+    ) 
+        onlyInitialized
+    public {
 
         IMarket market = realitio_questions[question_id].augur_market;
 
@@ -260,6 +283,7 @@ contract RealitioAugurArbitrator is BalanceHolder {
     /// @param question_id The question in question
     /// @param max_previous The highest bond level we should accept (used to check the state hasn't changed)
     function requestArbitration(bytes32 question_id, uint256 max_previous) 
+        onlyInitialized
     external payable returns (bool) {
 
         uint256 arbitration_fee = getDisputeFee(question_id);
