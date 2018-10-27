@@ -54,12 +54,12 @@ contract RealitioAugurArbitrator is BalanceHolder {
     mapping(bytes32 => RealitioQuestion) public realitio_questions;
 
     modifier onlyInitialized() { 
-        require(dispute_fee > 0);
+        require(dispute_fee > 0, "The contract cannot be used until a dispute fee has been set");
         _;
     }
 
     modifier onlyUninitialized() { 
-        require(dispute_fee == 0); // uninitialized
+        require(dispute_fee == 0, "The contract can only be initialized once");
         _;
     }
 
@@ -73,10 +73,10 @@ contract RealitioAugurArbitrator is BalanceHolder {
         onlyUninitialized
     external {
 
-        require(_dispute_fee > 0);
-        require(_realitio != IRealitio(0x0));
-        require(_genesis_universe != IUniverse(0x0));
-        require(_market_token != ICash(0x0));
+        require(_dispute_fee > 0, "You must provide a dispute fee");
+        require(_realitio != IRealitio(0x0), "You must provide a realitio address");
+        require(_genesis_universe != IUniverse(0x0), "You must provide a genesis universe");
+        require(_market_token != ICash(0x0), "You must provide an augur cash token");
 
         dispute_fee = _dispute_fee;
         template_id = _template_id;
@@ -131,9 +131,8 @@ contract RealitioAugurArbitrator is BalanceHolder {
         // Reconstruct the question ID from the content
         bytes32 question_id = keccak256(keccak256(template_id, opening_ts, question), this, timeout, asker, nonce);
 
-        // Arbitration must have been requested, and the market not yet created.
-        require(realitio_questions[question_id].bounty > 0);
-        require(realitio_questions[question_id].augur_market == IMarket(0x0));
+        require(realitio_questions[question_id].bounty > 0, "Arbitration must have been requested (paid for)");
+        require(realitio_questions[question_id].augur_market == IMarket(0x0), "The market must not have been created yet");
 
         // Create a market in Augur
         _callAugurMarketCreate(question_id, question, designated_reporter);
@@ -152,10 +151,10 @@ contract RealitioAugurArbitrator is BalanceHolder {
         bytes32 question_id, 
         bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment
     ) internal view returns (bool, bytes32) {
-        require(realitio.isPendingArbitration(question_id));
+        require(realitio.isPendingArbitration(question_id), "The question must be pending arbitration in realitio");
         bytes32 history_hash = realitio.getHistoryHash(question_id);
         
-        require(history_hash == keccak256(last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment));
+        require(history_hash == keccak256(last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment), "The history parameters supplied must match the history hash in the realitio contract");
 
     }
 
@@ -196,7 +195,7 @@ contract RealitioAugurArbitrator is BalanceHolder {
                 is_answered = true;
             } else {
                 // Shouldn't normally happen, but if the last answerer might still reveal when we are called, bail out and wait for them.
-                require(reveal_ts < uint32(now));
+                require(reveal_ts < uint32(now), "Arbitration cannot be done until the last answerer has had time to reveal their commitment");
                 is_answered = false;
             }
         } else {
@@ -255,7 +254,7 @@ contract RealitioAugurArbitrator is BalanceHolder {
         IMarket market = realitio_questions[question_id].augur_market;
 
         // There must be an open bounty
-        require(realitio_questions[question_id].bounty > 0);
+        require(realitio_questions[question_id].bounty > 0, "Arbitration must have been requested for this question");
 
         bool is_answered; // the answer was provided, not just left as an unrevealed commit
         bytes32 last_answer;
@@ -264,7 +263,7 @@ contract RealitioAugurArbitrator is BalanceHolder {
 
         (is_answered, last_answer) = _answerData(question_id, last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment);  
 
-        require(market.isFinalized());
+        require(market.isFinalized(), "The augur market must have been finalized");
 
         bytes32 answer = realitioAnswerFromAugurMarket(market);
         address winner;
@@ -303,8 +302,8 @@ contract RealitioAugurArbitrator is BalanceHolder {
     external payable returns (bool) {
 
         uint256 arbitration_fee = getDisputeFee(question_id);
-        require(arbitration_fee > 0);
-        require(msg.value >= arbitration_fee);
+        require(arbitration_fee > 0, "A fee must have been set");
+        require(msg.value >= arbitration_fee, "The payment must cover the fee");
 
         realitio.notifyOfArbitrationRequest(question_id, msg.sender, max_previous);
 
