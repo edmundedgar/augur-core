@@ -64,6 +64,11 @@ contract RealitioAugurArbitrator is BalanceHolder {
     }
 
     /// @notice Initialize a new contract
+    /// @param _realitio The address of the realitio contract you arbitrate for
+    /// @param _template_id The ID of the realitio template we support. 
+    /// @param _dispute_fee The fee this contract will charge for resolution
+    /// @param _genesis_universe The earliest supported Augur universe
+    /// @param _market_token The token used by the market we create, typically Augur's wrapped ETH
     function initialize(IRealitio _realitio, uint256 _template_id, uint256 _dispute_fee, IUniverse _genesis_universe, ICash _market_token) 
         onlyUninitialized
     external {
@@ -92,9 +97,11 @@ contract RealitioAugurArbitrator is BalanceHolder {
     }
 
     /// @notice Trim the realitio question content to the part before the initial delimiter.
+    /// @dev The Realitio question is a list of parameters for a template.
     /// @dev We throw away the subsequent parameters of the question.
-    /// @dev The first item in this template is the title.
-    /// @dev Subsequent items (category, lang) aren't needed in Augur
+    /// @dev The first item in the (supported) template must be the title.
+    /// @dev Subsequent items (category, lang) aren't needed in Augur.
+    /// @dev This does not support more complex templates, eg selects which also need a list of answrs.
     function _trimQuestion(string q) 
     internal pure returns (string) {
         return q.toSlice().split(REALITIO_DELIMITER.toSlice()).toString();
@@ -109,7 +116,7 @@ contract RealitioAugurArbitrator is BalanceHolder {
     /// @notice Create a market in Augur and store the creator as its owner
     /// @dev Anyone can call this, and calling this will give them the rights to claim the bounty
     /// @dev They will need have sent this contract some REP for the no-show bond.
-    /// @param question The question content // TODO Check if realitio format and the Augur format, see if we need to convert anything
+    /// @param question The question content (a delimited parameter list)
     /// @param timeout The timeout between rounds, set when the question was created
     /// @param opening_ts The opening timestamp for the question, set when the question was created
     /// @param asker The address that created the question, ie the msg.sender of the original realitio.askQuestion call
@@ -121,12 +128,14 @@ contract RealitioAugurArbitrator is BalanceHolder {
     ) 
         onlyInitialized
     external payable {
-        // Make sure the parameters provided match the question in question
+        // Reconstruct the question ID from the content
         bytes32 question_id = keccak256(keccak256(template_id, opening_ts, question), this, timeout, asker, nonce);
+
+        // Arbitration must have been requested, and the market not yet created.
         require(realitio_questions[question_id].bounty > 0);
         require(realitio_questions[question_id].augur_market == IMarket(0x0));
 
-        // Create a market that's already finished
+        // Create a market in Augur
         _callAugurMarketCreate(question_id, question, designated_reporter);
     }
 
@@ -134,6 +143,11 @@ contract RealitioAugurArbitrator is BalanceHolder {
     /// @dev Filters the question struct from Realitio to stuff we need
     /// @dev Broken out into its own function to avoid stack depth limitations
     /// @param question_id The realitio question
+    /// @param last_history_hash The history hash when you gave your answer 
+    /// @param last_answer_or_commitment_id The last answer given, or its commitment ID if it was a commitment 
+    /// @param last_bond The bond paid in the last answer given
+    /// @param last_answerer The account that submitted the last answer (or its commitment)
+    /// @param is_commitment Whether the last answer was submitted with commit->reveal
     function _verifyInput(
         bytes32 question_id, 
         bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment
@@ -180,7 +194,7 @@ contract RealitioAugurArbitrator is BalanceHolder {
             if (is_revealed) {
                 last_answer = revealed_answer;
             } else {
-                // Shouldn't normally happen, but if the last answerer might still reveal, bail out and wait for them.
+                // Shouldn't normally happen, but if the last answerer might still reveal when we are called, bail out and wait for them.
                 require(reveal_ts < uint32(now));
                 is_answered = false;
             }
@@ -279,7 +293,7 @@ contract RealitioAugurArbitrator is BalanceHolder {
 
     /// @notice Request arbitration, freezing the question until we send submitAnswerByArbitrator
     /// @dev The bounty can be paid only in part, in which case the last person to pay will be considered the payer
-    /// Will trigger an error if the notification fails, eg because the question has already been finalized
+    /// @dev Will trigger an error if the notification fails, eg because the question has already been finalized
     /// @param question_id The question in question
     /// @param max_previous The highest bond level we should accept (used to check the state hasn't changed)
     function requestArbitration(bytes32 question_id, uint256 max_previous) 
